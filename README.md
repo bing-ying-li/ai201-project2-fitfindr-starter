@@ -316,6 +316,7 @@ I used ChatGPT again to help implement `handle_query()` in `app.py`. I verified 
 ## Demo Video Checklist
 
 The demo video shows:
+<img src='Animation.gif' title='Video Walkthrough' width='' alt='Video Walkthrough' />
 
 - A complete successful interaction from search to fit card.
 - The selected item being passed through the session state.
