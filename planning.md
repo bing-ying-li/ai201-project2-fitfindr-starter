@@ -94,7 +94,7 @@ A 2–4 sentence caption that mentions the item, price, platform, and outfit vib
 
 <!-- Copy the block above for any tools beyond the required three -->
 
----
+## No additional tools are implemented for the required version of this project.
 
 ## Planning Loop
 
@@ -152,31 +152,104 @@ For each tool, describe the specific failure mode you're handling and what the a
      search_listings() using load_listings() from the data loader — then test it against 3 queries
      before trusting it" is a plan. -->
 
-milestone 2 : I use Mermaid for make diagram
 **Milestone 3 — Individual tool implementations:**
+I will use ChatGPT to help turn the project requirements into a clear planning document. I will give it the required tool list, planning loop requirements, state management requirements, and the required error paths. I expect it to produce a specific plan and a text-based Mermaid architecture diagram. I will verify the output by checking that the diagram includes the user, planning loop, session state, all three tools, and the no-results error branch.
 
 **Milestone 4 — Planning loop and state management:**
-
----
+I will give ChatGPT the Planning Loop section, State Management section, and Mermaid diagram from this document. I will ask it to implement run_agent() in agent.py using the existing session dictionary structure. I will verify that the planning loop branches correctly: if search_listings returns no results, the agent sets session["error"] and returns early without calling suggest_outfit or create_fit_card.
+I will also ask ChatGPT to help implement handle_query() in app.py. I will verify that the Gradio interface maps session["selected_item"], session["outfit_suggestion"], and session["fit_card"] to the three output panels. I will test both a successful query and a no-results query.
 
 ## A Complete Interaction (Step by Step)
 
 Write out what a full user interaction looks like from start to finish — tool call by tool call. Use a specific example query.
 
-**Example user query:** "I'm looking for a vintage graphic tee under $30. I mostly wear baggy jeans and chunky sneakers. What's out there and how would I style it?"
+**Example user query:**
 
-**Step 1:**
+> "I'm looking for a vintage graphic tee under $30. I mostly wear baggy jeans and chunky sneakers. What's out there and how would I style it?"
 
-<!-- What does the agent do first? Which tool is called? With what input? -->
+### Step 1: Parse the query
 
-**Step 2:**
+The agent receives the user's natural language request. It parses the query into:
 
-<!-- What happens next? What was returned from step 1? What tool is called now? -->
+- `description`: `"vintage graphic tee"`
+- `size`: `None`
+- `max_price`: `30.0`
 
-**Step 3:**
+These parsed values are stored in `session["parsed"]`.
 
-<!-- Continue until the full interaction is complete -->
+---
 
-**Final output to user:**
+### Step 2: Search listings
 
-<!-- What does the user actually see at the end? -->
+The agent calls:
+
+```python
+search_listings(
+    description="vintage graphic tee",
+    size=None,
+    max_price=30.0
+)
+```
+
+If this returns an empty list, the agent stores an error message in `session["error"]` and returns early.
+
+If results are found, the returned listings are stored in `session["search_results"]`. The agent selects the first listing as the best match and stores it in `session["selected_item"]`.
+
+Example selected item:
+
+```python
+{
+    "title": "Y2K Baby Tee — Butterfly Print",
+    "price": 18.0,
+    "platform": "Depop",
+    "size": "M"
+}
+```
+
+---
+
+### Step 3: Suggest outfit
+
+The agent calls:
+
+```python
+suggest_outfit(
+    new_item=session["selected_item"],
+    wardrobe=session["wardrobe"]
+)
+```
+
+The outfit suggestion is stored in `session["outfit_suggestion"]`.
+
+Example outfit suggestion:
+
+> Pair the Y2K baby tee with baggy straight-leg jeans and chunky white sneakers for a relaxed streetwear look. The fitted tee balances the loose jeans, while the sneakers keep the outfit casual and easy to wear.
+
+---
+
+### Step 4: Create fit card
+
+The agent calls:
+
+```python
+create_fit_card(
+    outfit=session["outfit_suggestion"],
+    new_item=session["selected_item"]
+)
+```
+
+The returned caption is stored in `session["fit_card"]`.
+
+---
+
+### Final output to user
+
+The user sees three output panels:
+
+1. **Top listing found:** The selected listing with title, price, platform, size, condition, colors, and description.
+2. **Outfit idea:** A complete styling suggestion using the selected item and wardrobe.
+3. **Your fit card:** A short shareable outfit caption.
+
+Example final fit card:
+
+> "Just found this Y2K Baby Tee — Butterfly Print on Depop for $18, and it fits perfectly into a relaxed streetwear look. Pair it with baggy jeans and chunky sneakers for an easy thrifted outfit that feels casual but still styled."

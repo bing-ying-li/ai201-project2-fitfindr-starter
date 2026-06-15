@@ -245,7 +245,7 @@ if __name__ == "__main__":
         print(f"Found: {session['selected_item']['title']}")
         print("Outfit suggestion stored in session['outfit_suggestion']:")
         print(f"\nOutfit: {session['outfit_suggestion']}")
-        print("Fit card stored in session['fit_card']:")
+        print(f"\nFit card stored in session['fit_card']:")
         print(f"\nFit card: {session['fit_card']}")
 
     print("\n\n=== No-results path ===\n")
