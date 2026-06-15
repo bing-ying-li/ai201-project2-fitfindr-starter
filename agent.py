@@ -17,7 +17,7 @@ Usage (once implemented):
     print(result["fit_card"])
     print(result["error"])   # None on success
 """
-
+import re
 from tools import search_listings, suggest_outfit, create_fit_card
 
 
@@ -42,6 +42,88 @@ def _new_session(query: str, wardrobe: dict) -> dict:
         "outfit_suggestion": None,   # string returned by suggest_outfit
         "fit_card": None,            # string returned by create_fit_card
         "error": None,               # set if the interaction ended early
+    }
+# ── query parsing helper ──────────────────────────────────────────────────────
+
+def _parse_query(query: str) -> dict:
+    """
+    Extract description, size, and max_price from a natural language query.
+
+    Example:
+        "vintage graphic tee under $30, size M"
+
+    Returns:
+        {
+            "description": "vintage graphic tee",
+            "size": "M",
+            "max_price": 30.0
+        }
+    """
+    original_query = query.strip()
+    working_text = original_query
+
+    # Extract max price from phrases like:
+    # under $30, below 40, less than $25, max $50
+    max_price = None
+    price_match = re.search(
+        r"(?:under|below|less than|max|maximum)\s*\$?\s*(\d+(?:\.\d+)?)",
+        working_text,
+        flags=re.IGNORECASE,
+    )
+    if price_match:
+        max_price = float(price_match.group(1))
+        working_text = re.sub(
+            r"(?:under|below|less than|max|maximum)\s*\$?\s*\d+(?:\.\d+)?",
+            "",
+            working_text,
+            flags=re.IGNORECASE,
+        )
+
+    # Extract size from phrases like:
+    # size M, in size M, sz 8
+    size = None
+    size_match = re.search(
+        r"(?:in\s+)?(?:size|sz)\s+([a-zA-Z0-9./-]+)",
+        working_text,
+        flags=re.IGNORECASE,
+    )
+    if size_match:
+        size = size_match.group(1).upper()
+        working_text = re.sub(
+            r"(?:in\s+)?(?:size|sz)\s+[a-zA-Z0-9./-]+",
+            "",
+            working_text,
+            flags=re.IGNORECASE,
+        )
+
+    # Remove common filler phrases so search_listings receives cleaner keywords.
+    filler_phrases = [
+        "i'm looking for",
+        "i am looking for",
+        "looking for",
+        "find me",
+        "can you find",
+        "i want",
+        "what's out there",
+        "what is out there",
+        "show me",
+    ]
+
+    description = working_text.lower()
+
+    for phrase in filler_phrases:
+        description = description.replace(phrase, "")
+
+    description = description.strip(" ,.-")
+
+    # Fallback: if parsing removed too much, use the original query.
+    if not description:
+        description = original_query
+
+    return {
+        "description": description,
+        "size": size,
+        "max_price": max_price,
     }
 
 
@@ -93,9 +175,57 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     of planning.md — your implementation should match what you described there.
     """
     # TODO: implement the planning loop
+    # session = _new_session(query, wardrobe)
+    # session["error"] = "Planning loop not yet implemented."
+    # return session
+    # Step 1: Initialize session.
     session = _new_session(query, wardrobe)
-    session["error"] = "Planning loop not yet implemented."
+
+    # Step 2: Parse the query.
+    parsed = _parse_query(query)
+    session["parsed"] = parsed
+
+    # Step 3: Search listings.
+    results = search_listings(
+        description=parsed["description"],
+        size=parsed["size"],
+        max_price=parsed["max_price"],
+    )
+    session["search_results"] = results
+
+    # Branch path: if search returns nothing, stop early.
+    # This is the important planning-loop behavior.
+    if not results:
+        size_text = f" in size {parsed['size']}" if parsed["size"] else ""
+        price_text = (
+            f" under ${parsed['max_price']:.0f}"
+            if parsed["max_price"] is not None
+            else ""
+        )
+
+        session["error"] = (
+            f"I couldn't find any listings for '{parsed['description']}'"
+            f"{size_text}{price_text}. Try using broader keywords, removing "
+            "the size filter, or increasing your budget."
+        )
+
+        return session
+
+    # Step 4: Select the top result and store it in state.
+    selected_item = results[0]
+    session["selected_item"] = selected_item
+
+    # Step 5: Pass selected_item into suggest_outfit.
+    outfit_suggestion = suggest_outfit(selected_item, wardrobe)
+    session["outfit_suggestion"] = outfit_suggestion
+
+    # Step 6: Pass outfit_suggestion and selected_item into create_fit_card.
+    fit_card = create_fit_card(outfit_suggestion, selected_item)
+    session["fit_card"] = fit_card
+
+    # Step 7: Return completed session.
     return session
+
 
 
 # ── CLI test ──────────────────────────────────────────────────────────────────
@@ -111,8 +241,11 @@ if __name__ == "__main__":
     if session["error"]:
         print(f"Error: {session['error']}")
     else:
+        print("Selected item stored in session['selected_item']:")
         print(f"Found: {session['selected_item']['title']}")
+        print("Outfit suggestion stored in session['outfit_suggestion']:")
         print(f"\nOutfit: {session['outfit_suggestion']}")
+        print("Fit card stored in session['fit_card']:")
         print(f"\nFit card: {session['fit_card']}")
 
     print("\n\n=== No-results path ===\n")
@@ -121,3 +254,11 @@ if __name__ == "__main__":
         wardrobe=get_example_wardrobe(),
     )
     print(f"Error message: {session2['error']}")
+    print("Parsed query:")
+    print(session2["parsed"])
+    print()
+
+    print(f"Error message: {session2['error']}")
+    print(f"Selected item: {session2['selected_item']}")
+    print(f"Outfit suggestion: {session2['outfit_suggestion']}")
+    print(f"Fit card: {session2['fit_card']}")

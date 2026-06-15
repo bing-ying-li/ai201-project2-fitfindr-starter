@@ -44,8 +44,46 @@ def handle_query(user_query: str, wardrobe_choice: str) -> tuple[str, str, str]:
            session["fit_card"].
     """
     # TODO: implement this function
-    return "Agent not yet implemented.", "", ""
+    # return "Agent not yet implemented.", "", ""
+    # Step 1: Guard against an empty query.
+    if not user_query or not user_query.strip():
+        return "Please enter what you are looking for.", "", ""
 
+    # Step 2: Select the wardrobe based on wardrobe_choice.
+    if wardrobe_choice == "Empty wardrobe (new user)":
+        wardrobe = get_empty_wardrobe()
+    else:
+        wardrobe = get_example_wardrobe()
+
+    # Step 3: Call the planning loop in agent.py.
+    session = run_agent(user_query.strip(), wardrobe)
+
+    # Step 4: If the agent stopped early, show the error only.
+    if session["error"]:
+        return session["error"], "", ""
+
+    # Step 5: Format selected item into readable text.
+    item = session["selected_item"]
+
+    listing_text = (
+        f"{item['title']}\n\n"
+        f"Price: ${item['price']:.2f}\n"
+        f"Platform: {item['platform']}\n"
+        f"Size: {item['size']}\n"
+        f"Condition: {item['condition']}\n"
+        f"Category: {item['category']}\n"
+        f"Brand: {item.get('brand') or 'Unknown'}\n"
+        f"Colors: {', '.join(item.get('colors', []))}\n"
+        f"Style tags: {', '.join(item.get('style_tags', []))}\n\n"
+        f"Description: {item['description']}"
+    )
+
+    # Step 6: Return text for the three Gradio output panels.
+    return (
+        listing_text,
+        session["outfit_suggestion"],
+        session["fit_card"],
+    )
 
 # ── interface ─────────────────────────────────────────────────────────────────
 
